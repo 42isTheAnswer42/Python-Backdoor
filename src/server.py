@@ -6,7 +6,7 @@ arrAddresses = []
 arrConnections = []
 
 strHost = "0.0.0.0"
-intPort = 3000
+intPort = 4444
 
 intBuff = 1024
 
@@ -112,6 +112,7 @@ def main_menu():
             list_connections()
 
         elif strChoice[:1] == "i" and len(strChoice) > 1:
+           # print("trigger "+strChoice[2:])
             conn = select_connection(strChoice[2:], True)
             if conn is not None:
                 send_commands()
