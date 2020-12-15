@@ -57,7 +57,7 @@ def startstream():
         ret, frame = cap.read()
         out.write(frame)
         cv2.imshow('frame',frame)
-        sendall(frame)
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             stopstream()
 
